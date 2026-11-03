@@ -23,10 +23,10 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;overscroll-behavior-y:none}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;background:var(--bg);color:var(--text);font-size:16.5px;line-height:1.55;overscroll-behavior-y:none}
 #app{display:flex;min-height:100vh;min-height:100dvh}
 /* 侧边栏 */
-.sidebar{width:82px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);padding:calc(14px + var(--safe-top)) 6px calc(14px + var(--safe-bottom));display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;scrollbar-width:none}
+.sidebar{width:88px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);padding:calc(16px + var(--safe-top)) 6px calc(16px + var(--safe-bottom));display:flex;flex-direction:column;gap:7px;position:sticky;top:0;height:100vh;height:100dvh;overflow-y:auto;scrollbar-width:none}
 .sidebar::-webkit-scrollbar{display:none}
 .logo{text-align:center;font-size:22px;margin-bottom:8px}
 .nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 2px;border-radius:11px;cursor:pointer;transition:all .18s;color:var(--text-secondary)}
@@ -189,11 +189,10 @@ select.input{background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns=
 /* ==================== 打卡项目定义 ==================== */
 /* kind: 'daily' 表示日历式固定项（每天四个坑），'free' 表示随时可记的日常项 */
 const TYPES = [
-    // 4 项核心（日历式）
+    // 3 项核心（日历式）
     {id:'send',  emoji:'🌅', name:'早起送园', short:'送园', kind:'daily'},
     {id:'pick',  emoji:'🌆', name:'晚上接园', short:'接园', kind:'daily'},
     {id:'bath',  emoji:'🛁', name:'晚上洗澡', short:'洗澡', kind:'daily'},
-    {id:'weekend',emoji:'🎠', name:'周末带娃', short:'周末', kind:'daily'},
     // 日常项（随时可记）
     {id:'meal',  emoji:'🍚', name:'做饭喂饭', kind:'free'},
     {id:'sleep', emoji:'💤', name:'哄睡',     kind:'free'},
@@ -279,14 +278,15 @@ function viewHome(){
     const days=[]; for(let i=0;i<7;i++){ const d=new Date(mon); d.setDate(mon.getDate()+i); days.push(d); }
     const tk=dateKey();
 
-    // 本周统计
-    let dadCnt=0, momCnt=0;
+    // 本周统计（按天去重：某天该人做了任意一项就算 1 天）
+    const dadDaySet=new Set(), momDaySet=new Set();
     days.forEach(d=>{
         const k=dateKey(d), o=duty[k]||{};
-        DAILY.forEach(t=>{ if(o[t.id]==='dad') dadCnt++; else if(o[t.id]==='mom') momCnt++; });
+        DAILY.forEach(t=>{ if(o[t.id]==='dad') dadDaySet.add(k); else if(o[t.id]==='mom') momDaySet.add(k); });
     });
     const weekFree = freeRecs.filter(r=>{ const k=r.date; return days.some(d=>dateKey(d)===k); });
-    weekFree.forEach(r=>{ if(r.who==='dad') dadCnt++; else if(r.who==='mom') momCnt++; });
+    weekFree.forEach(r=>{ if(r.who==='dad') dadDaySet.add(r.date); else if(r.who==='mom') momDaySet.add(r.date); });
+    const dadCnt=dadDaySet.size, momCnt=momDaySet.size;
 
     // 今日免费打卡计数
     const todayFree = freeRecs.filter(r=>r.date===tk);
@@ -301,11 +301,11 @@ function viewHome(){
     <div class="today-bar">
         <div class="who-card dad">
             <div class="wc-emoji">👨</div><div class="wc-name">爸爸</div>
-            <div class="wc-cnt">${dadCnt}</div><div class="wc-unit">本周分担</div>
+            <div class="wc-cnt">${dadCnt}</div><div class="wc-unit">本周带娃 · 天</div>
         </div>
         <div class="who-card mom">
             <div class="wc-emoji">👩</div><div class="wc-name">妈妈</div>
-            <div class="wc-cnt">${momCnt}</div><div class="wc-unit">本周分担</div>
+            <div class="wc-cnt">${momCnt}</div><div class="wc-unit">本周带娃 · 天</div>
         </div>
     </div>
 
@@ -385,20 +385,37 @@ function viewStats(){
     const sK=dateKey(mon), eK=dateKey(sun);
     const inRange = k=> k>=sK && k<=eK;
 
-    // 统计各项：爸爸/妈妈次数
+    // 统计：按【天数】计——爸爸做了几天 / 妈妈做了几天
     const stat={};
     TYPES.forEach(t=>stat[t.id]={dad:0,mom:0});
-    // 日历式
+    // 日历式：每天每个项目只有一格，天然按天
     Object.keys(duty).forEach(k=>{
         if(!inRange(k)) return;
         const o=duty[k]||{};
         DAILY.forEach(t=>{ if(o[t.id]==='dad') stat[t.id].dad++; else if(o[t.id]==='mom') stat[t.id].mom++; });
     });
-    // 日常
-    freeRecs.forEach(r=>{ if(inRange(r.date)&&stat[r.type]) stat[r.type][r.who]++; });
+    // 日常项：同一天同一人同一项目只算 1 天（去重）
+    const freeSeen={};
+    freeRecs.forEach(r=>{
+        if(!inRange(r.date)||!stat[r.type]) return;
+        const key=`${r.type}|${r.who}|${r.date}`;
+        if(freeSeen[key]) return;
+        freeSeen[key]=1;
+        stat[r.type][r.who]++;
+    });
 
-    let dadTotal=0, momTotal=0;
-    TYPES.forEach(t=>{ dadTotal+=stat[t.id].dad; momTotal+=stat[t.id].mom; });
+    // 总计也按天去重：某天该人只要做了任意一项，就记 1 天
+    const dadDays=new Set(), momDays=new Set();
+    Object.keys(duty).forEach(k=>{
+        if(!inRange(k)) return;
+        const o=duty[k]||{};
+        DAILY.forEach(t=>{ if(o[t.id]==='dad') dadDays.add(k); else if(o[t.id]==='mom') momDays.add(k); });
+    });
+    freeRecs.forEach(r=>{
+        if(!inRange(r.date)) return;
+        if(r.who==='dad') dadDays.add(r.date); else if(r.who==='mom') momDays.add(r.date);
+    });
+    const dadTotal=dadDays.size, momTotal=momDays.size;
     const total=dadTotal+momTotal;
     const maxV=Math.max(1,...TYPES.map(t=>Math.max(stat[t.id].dad,stat[t.id].mom)));
     const active=TYPES.filter(t=>stat[t.id].dad+stat[t.id].mom>0)
@@ -422,8 +439,8 @@ function viewStats(){
     </div>
 
     <div class="stat-grid">
-        <div class="stat-box"><div class="stat-num" style="color:var(--blue)">${dadTotal}</div><div class="stat-lbl">👨 爸爸总次数</div></div>
-        <div class="stat-box"><div class="stat-num" style="color:var(--pink)">${momTotal}</div><div class="stat-lbl">👩 妈妈总次数</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--blue)">${dadTotal}<span style="font-size:13px;font-weight:600">天</span></div><div class="stat-lbl">👨 爸爸带娃天数</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--pink)">${momTotal}<span style="font-size:13px;font-weight:600">天</span></div><div class="stat-lbl">👩 妈妈带娃天数</div></div>
     </div>
 
     ${total?`
@@ -439,11 +456,11 @@ function viewStats(){
     </div>
 
     <div class="card">
-        <div class="card-title">📊 各项对比</div>
+        <div class="card-title">📊 各项对比<span class="ext">单位：天</span></div>
         ${active.length?`<div class="bar-chart">
             ${active.map(t=>`
                 <div style="margin-bottom:11px">
-                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">${t.emoji} ${t.name}</div>
+                    <div style="font-size:12.5px;color:var(--text-secondary);margin-bottom:4px">${t.emoji} ${t.name}</div>
                     <div class="bar-row">
                         <div class="bar-label" style="color:var(--blue)">爸爸</div>
                         <div class="bar-track"><div class="bar-fill dad" style="width:${stat[t.id].dad/maxV*100}%"></div></div>
