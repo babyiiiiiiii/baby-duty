@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>数据检查</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{font-family:-apple-system,sans-serif;background:#fdf6f4;margin:0;padding:16px;color:#3d2f2f}
+h2{font-size:17px;margin:0 0 12px}
+.box{background:#fff;border-radius:12px;padding:14px;margin-bottom:11px;box-shadow:0 1px 4px rgba(160,120,120,.1)}
+.k{font-size:12px;color:#9a8888;margin-bottom:4px}
+.v{font-size:13px;word-break:break-all;font-family:monospace;background:#faf5f4;padding:7px;border-radius:6px}
+.big{font-size:22px;font-weight:800;color:#c96b6b}
+ul{padding-left:18px;margin:8px 0}li{font-size:12.5px;color:#8a7070;line-height:1.7}
+</style></head>
+<body>
+<h2>📦 你的数据检查结果</h2>
+<div class="box"><div class="k">当前网址</div><div class="v" id="url"></div></div>
+<div class="box"><div class="k">分工记录条数</div><div class="big" id="duty">-</div></div>
+<div class="box"><div class="k">日常打卡条数</div><div class="big" id="free">-</div></div>
+<div class="box"><div class="k">宝宝信息</div><div class="v" id="baby"></div></div>
+<div class="box"><div class="k">全部存储键（含其他版本的数据）</div><div class="v" id="keys"></div></div>
+<div class="box"><div class="k">原始分工数据</div><div class="v" id="rawduty" style="max-height:150px;overflow:auto"></div></div>
+<script>
+document.getElementById('url').textContent = location.origin + location.pathname;
+const g = k => { try { return localStorage.getItem(k); } catch(e){ return 'ERROR'; } };
+const p = s => { try { return JSON.parse(s); } catch(e){ return null; } };
+const d = p(g('bw_duty')) || {};
+const f = p(g('bw_free')) || [];
+document.getElementById('duty').textContent = Object.keys(d).length + ' 天';
+document.getElementById('free').textContent = f.length + ' 条';
+document.getElementById('baby').textContent = g('bw_baby') || '（空）';
+const keys = [];
+for (let i=0;i<localStorage.length;i++) keys.push(localStorage.key(i));
+document.getElementById('keys').textContent = keys.join(', ') || '（空）';
+document.getElementById('rawduty').textContent = JSON.stringify(d);
+</script>
+</body></html>
