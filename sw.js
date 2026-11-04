@@ -1,5 +1,5 @@
 // Service Worker - 带娃打卡离线缓存
-const CACHE_NAME = 'babywork-v13-redlinechin';
+const CACHE_NAME = 'babywork-v14-chinconnect';
 const ASSETS = [
     './',
     './index.html',
