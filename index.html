@@ -67,6 +67,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .day-lbl .dd{font-size:10px;color:var(--text-light)}
 .day-lbl.is-today{color:var(--primary)}
 .day-lbl.is-today .dn{color:var(--primary)}
+.day-lbl.is-sel{color:#fff;background:linear-gradient(135deg,var(--primary),var(--primary-light));border-radius:9px;padding:3px 4px;margin:-3px 0}
+.day-lbl.is-sel .dn,.day-lbl.is-sel .dd{color:#fff}
 .slot-group{display:flex;gap:5px;flex:1;min-width:0}
 .slot{
     flex:1;min-width:0;height:38px;border-radius:10px;border:1.5px dashed var(--border);
@@ -276,6 +278,7 @@ function renderPage(){
 /* ---------- 首页：分工表（周视图，可选日期跳转） ---------- */
 let homeWeekOffset = 0;          // 相对锚点周偏移
 let homeAnchorDate = '';         // 锚点日期（空 = 今天）
+let homeSelDate = '';            // 当前选中的日期（打卡目标日）
 function homePickDate(){
     openModal('跳转到某一周', `
         <div class="form-row">
@@ -309,9 +312,17 @@ function viewHome(){
 
     const rangeLabel = homeWeekOffset===0 ? '本周' : (homeWeekOffset===-1?'上周':(homeWeekOffset===1?'下周':`${homeWeekOffset>0?'后':'前'}${Math.abs(homeWeekOffset)}周`));
 
+    // 当前选中日期（默认今天；若今天不在显示的周内，默认周一）
+    if(!homeSelDate || !days.some(d=>dateKey(d)===homeSelDate)){
+        homeSelDate = days.some(d=>dateKey(d)===tk) ? tk : dateKey(days[0]);
+    }
+    const selK = homeSelDate;
+    const selLabel = selK===tk ? '今天' : `${parseInt(selK.slice(5,7))}月${parseInt(selK.slice(8,10))}日`;
+
     // 今日免费打卡计数
     const todayFree = freeRecs.filter(r=>r.date===tk);
-    const freeCnt={}; todayFree.forEach(r=>freeCnt[r.type]=(freeCnt[r.type]||0)+1);
+    const selFree = freeRecs.filter(r=>r.date===selK);
+    const freeCnt={}; selFree.forEach(r=>freeCnt[r.type]=(freeCnt[r.type]||0)+1);
 
     return `
     <div class="page-head"><div>
@@ -340,12 +351,12 @@ function viewHome(){
                 <button onclick="homeWeekOffset++;renderPage()">›</button>
             </div>
         </div>
-        <div class="day-table">${days.map(d=>renderDayRow(d, tk)).join('')}</div>
-        <div style="font-size:11px;color:var(--text-light);text-align:center;margin-top:8px">点格子循环：空 → 爸爸 → 妈妈 → 空</div>
+        <div class="day-table">${days.map(d=>renderDayRow(d, tk, selK)).join('')}</div>
+        <div style="font-size:11px;color:var(--text-light);text-align:center;margin-top:8px">点格子填分工 · 点左边日期选中那天（下方打卡记到那天）</div>
     </div>
 
     <div class="card">
-        <div class="card-title">💗 今天谁在带娃</div>
+        <div class="card-title">💗 ${selLabel}谁在带娃</div>
         <div class="who-picker">
             <div class="who-opt ${curWho==='dad'?'sel-dad':''}" onclick="setWho('dad')">👨 爸爸</div>
             <div class="who-opt ${curWho==='mom'?'sel-mom':''}" onclick="setWho('mom')">👩 妈妈</div>
@@ -356,16 +367,17 @@ function viewHome(){
                 <div class="pi">${p.emoji}</div><div class="pl">${p.name}</div>
             </div>`).join('')}
         </div>
-        ${todayFree.length?`<div style="margin-top:12px;font-size:12px;color:var(--text-secondary);text-align:center">今天已记 ${todayFree.length} 条日常</div>`:`<div style="margin-top:12px;font-size:12px;color:var(--text-light);text-align:center">点上面按钮记一笔日常（做饭/哄睡/陪玩…）</div>`}
+        ${selFree.length?`<div style="margin-top:12px;font-size:12px;color:var(--text-secondary);text-align:center">${selLabel}已记 ${selFree.length} 条日常</div>`:`<div style="margin-top:12px;font-size:12px;color:var(--text-light);text-align:center">点上面按钮记一笔日常（做饭/哄睡/陪玩…）</div>`}
     </div>`;
 }
-function renderDayRow(d, tk){
+function renderDayRow(d, tk, selK){
     const k=dateKey(d), o=duty[k]||{};
     const isToday = k===tk;
+    const isSel = k===selK;
     const wdn=['日','一','二','三','四','五','六'][d.getDay()];
     const mm=d.getMonth()+1, dd=d.getDate();
     return `<div class="day-row">
-        <div class="day-lbl ${isToday?'is-today':''}">
+        <div class="day-lbl ${isSel?'is-sel':(isToday?'is-today':'')}" onclick="homeSelDate='${k}';renderPage()">
             <div class="dn">${isToday?'今天':'周'+wdn}</div>
             <div class="dd">${mm}/${dd}</div>
         </div>
@@ -399,10 +411,12 @@ function cycleSlot(dateKeyStr, typeId){
 function setWho(w){ curWho=w; ls.set('bw_curWho',w); renderPage(); vibrate(8); }
 function punchFree(typeId){
     const t=typeInfo(typeId);
-    freeRecs.push({id:Date.now()+Math.floor(Math.random()*1000), date:dateKey(), time:nowHM(), type:typeId, who:curWho, note:''});
+    const targetDate = (typeof homeSelDate!=='undefined' && homeSelDate) ? homeSelDate : dateKey();
+    freeRecs.push({id:Date.now()+Math.floor(Math.random()*1000), date:targetDate, time:nowHM(), type:typeId, who:curWho, note:''});
     ls.set('bw_free', freeRecs);
     vibrate(12);
-    toast(`${WHO[curWho].emoji} ${WHO[curWho].name} · ${t.emoji} ${t.name}`);
+    const dl = targetDate===dateKey()?'今天':`${parseInt(targetDate.slice(5,7))}月${parseInt(targetDate.slice(8,10))}日`;
+    toast(`${WHO[curWho].emoji} ${WHO[curWho].name} · ${t.emoji} ${t.name}（${dl}）`);
     renderPage();
 }
 function delFree(id){ freeRecs=freeRecs.filter(r=>r.id!==id); ls.set('bw_free',freeRecs); renderPage(); toast('已删除'); }
