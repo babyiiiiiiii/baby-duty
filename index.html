@@ -135,6 +135,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .bar-num{font-size:11px;font-weight:700;color:var(--text);margin-left:2px;flex-shrink:0;width:22px}
 .week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
 .week-title{font-size:13.5px;font-weight:600}
+.mode-nav{display:flex;gap:6px;margin-bottom:11px;background:var(--card);padding:4px;border-radius:11px;width:fit-content;box-shadow:0 1px 4px rgba(160,120,120,.06)}
+.mode-tab{padding:6px 22px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-light);cursor:pointer;transition:all .15s}
+.mode-tab.on{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff;box-shadow:0 2px 8px rgba(201,107,107,.25)}
 .week-btns{display:flex;gap:6px}
 .week-btns button{width:30px;height:30px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:var(--text-secondary);font-size:15px;cursor:pointer}
 .week-btns button:active{background:var(--bg)}
@@ -378,33 +381,40 @@ function punchFree(typeId){
 function delFree(id){ freeRecs=freeRecs.filter(r=>r.id!==id); ls.set('bw_free',freeRecs); renderPage(); toast('已删除'); }
 
 /* ---------- 统计 ---------- */
+let statsMode='week';   // 'week' | 'month'
+let statsMonthOffset=0;
 function viewStats(){
-    const now=new Date(); const wd=now.getDay()||7;
-    const mon=new Date(now); mon.setDate(now.getDate()-wd+1+statsWeekOffset*7); mon.setHours(0,0,0,0);
-    const sun=new Date(mon); sun.setDate(mon.getDate()+6);
-    const sK=dateKey(mon), eK=dateKey(sun);
+    const now=new Date();
+    let sK, eK, rangeLabel;
+    if(statsMode==='week'){
+        const wd=now.getDay()||7;
+        const mon=new Date(now); mon.setDate(now.getDate()-wd+1+statsWeekOffset*7); mon.setHours(0,0,0,0);
+        const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+        sK=dateKey(mon); eK=dateKey(sun);
+        rangeLabel = statsWeekOffset===0?'本周':(statsWeekOffset===-1?'上周':`${statsWeekOffset>0?'后':'前'}${Math.abs(statsWeekOffset)}周`);
+    }else{
+        const base=new Date(now.getFullYear(), now.getMonth()+statsMonthOffset, 1);
+        const y=base.getFullYear(), m=base.getMonth();
+        sK=dateKey(new Date(y,m,1));
+        eK=dateKey(new Date(y,m+1,0));
+        rangeLabel = statsMonthOffset===0?`${m+1}月`:`${y}年${m+1}月`;
+    }
     const inRange = k=> k>=sK && k<=eK;
 
-    // 统计：按【天数】计——爸爸做了几天 / 妈妈做了几天
+    // 各项对比：按【次】计——每次打卡算一次
     const stat={};
     TYPES.forEach(t=>stat[t.id]={dad:0,mom:0});
-    // 日历式：每天每个项目只有一格，天然按天
     Object.keys(duty).forEach(k=>{
         if(!inRange(k)) return;
         const o=duty[k]||{};
         DAILY.forEach(t=>{ if(o[t.id]==='dad') stat[t.id].dad++; else if(o[t.id]==='mom') stat[t.id].mom++; });
     });
-    // 日常项：同一天同一人同一项目只算 1 天（去重）
-    const freeSeen={};
     freeRecs.forEach(r=>{
         if(!inRange(r.date)||!stat[r.type]) return;
-        const key=`${r.type}|${r.who}|${r.date}`;
-        if(freeSeen[key]) return;
-        freeSeen[key]=1;
         stat[r.type][r.who]++;
     });
 
-    // 总计也按天去重：某天该人只要做了任意一项，就记 1 天
+    // 总计：按【天】去重——某天做了任意一项就算 1 天
     const dadDays=new Set(), momDays=new Set();
     Object.keys(duty).forEach(k=>{
         if(!inRange(k)) return;
@@ -421,20 +431,23 @@ function viewStats(){
     const active=TYPES.filter(t=>stat[t.id].dad+stat[t.id].mom>0)
         .sort((a,b)=>(stat[b.id].dad+stat[b.id].mom)-(stat[a.id].dad+stat[a.id].mom));
 
-    const label = statsWeekOffset===0?'本周':(statsWeekOffset===-1?'上周':`${statsWeekOffset>0?'后':'前'}${Math.abs(statsWeekOffset)}周`);
-
     return `
     <div class="page-head"><div>
         <div class="page-title">分工统计</div>
         <div class="page-sub">看看谁更辛苦</div>
     </div></div>
 
+    <div class="mode-nav">
+        <div class="mode-tab ${statsMode==='week'?'on':''}" onclick="statsMode='week';renderPage()">周</div>
+        <div class="mode-tab ${statsMode==='month'?'on':''}" onclick="statsMode='month';renderPage()">月</div>
+    </div>
+
     <div class="week-nav">
-        <div class="week-title">${label} ${sK.slice(5).replace('-','/')} - ${eK.slice(5).replace('-','/')}</div>
+        <div class="week-title">${rangeLabel} <span style="font-weight:400;color:var(--text-light);font-size:11.5px">${sK.slice(5).replace('-','/')} - ${eK.slice(5).replace('-','/')}</span></div>
         <div class="week-btns">
-            <button onclick="statsWeekOffset--;renderPage()">‹</button>
-            <button onclick="statsWeekOffset=0;renderPage()">今</button>
-            <button onclick="statsWeekOffset++;renderPage()">›</button>
+            <button onclick="statsMode==='week'?statsWeekOffset--:statsMonthOffset--;renderPage()">‹</button>
+            <button onclick="statsWeekOffset=0;statsMonthOffset=0;renderPage()">今</button>
+            <button onclick="statsMode==='week'?statsWeekOffset++:statsMonthOffset++;renderPage()">›</button>
         </div>
     </div>
 
@@ -456,7 +469,7 @@ function viewStats(){
     </div>
 
     <div class="card">
-        <div class="card-title">📊 各项对比<span class="ext">单位：天</span></div>
+        <div class="card-title">📊 各项对比<span class="ext">单位：次</span></div>
         ${active.length?`<div class="bar-chart">
             ${active.map(t=>`
                 <div style="margin-bottom:11px">
