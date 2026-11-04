@@ -91,7 +91,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue"
 .punch-btn:active{transform:scale(.94);background:#ffe8e4;border-color:var(--primary-light)}
 .punch-btn .pi{font-size:23px;line-height:1}
 .punch-btn .pl{font-size:10.5px;font-weight:600;color:var(--text-secondary);white-space:nowrap}
-.punch-btn .badge{position:absolute;top:-5px;right:-4px;background:var(--primary);color:#fff;font-size:9.5px;font-weight:700;min-width:17px;height:17px;border-radius:9px;display:flex;align-items:center;justify-content:center;padding:0 4px;box-shadow:0 1px 3px rgba(201,107,107,.4)}
+.punch-btn .badge{position:absolute;top:-5px;right:-4px;font-size:12px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
+.punch-btn.done{border-style:solid}
+.punch-btn.done.dad{background:#eaf2fb;border-color:var(--blue)}
+.punch-btn.done.mom{background:#fdecef;border-color:var(--pink)}
+.punch-btn.done.dad .pi{color:#4a7ca8;font-size:20px;font-weight:800}
+.punch-btn.done.mom .pi{color:#c96070;font-size:20px;font-weight:800}
+.punch-btn.done.dad .pl{color:#4a7ca8}
+.punch-btn.done.mom .pl{color:#c96070}
 /* 打卡人选择器 */
 .who-picker{display:flex;gap:8px;margin-bottom:13px}
 .who-opt{flex:1;padding:9px;border-radius:11px;text-align:center;cursor:pointer;border:1.5px solid var(--border);background:var(--bg);font-size:13.5px;font-weight:600;color:var(--text-secondary);transition:all .15s}
@@ -320,9 +327,7 @@ function viewHome(){
     const selLabel = selK===tk ? '今天' : `${parseInt(selK.slice(5,7))}月${parseInt(selK.slice(8,10))}日`;
 
     // 今日免费打卡计数
-    const todayFree = freeRecs.filter(r=>r.date===tk);
     const selFree = freeRecs.filter(r=>r.date===selK);
-    const freeCnt={}; selFree.forEach(r=>freeCnt[r.type]=(freeCnt[r.type]||0)+1);
 
     return `
     <div class="page-head"><div>
@@ -356,18 +361,24 @@ function viewHome(){
     </div>
 
     <div class="card">
-        <div class="card-title">💗 ${selLabel}谁在带娃</div>
+        <div class="card-title">💗 ${selLabel}谁在带娃<span class="ext">已选：${WHO[curWho].emoji}${WHO[curWho].name}</span></div>
         <div class="who-picker">
             <div class="who-opt ${curWho==='dad'?'sel-dad':''}" onclick="setWho('dad')">👨 爸爸</div>
             <div class="who-opt ${curWho==='mom'?'sel-mom':''}" onclick="setWho('mom')">👩 妈妈</div>
         </div>
         <div class="punch-grid">
-            ${FREE.map(p=>`<div class="punch-btn" onclick="punchFree('${p.id}')">
-                ${freeCnt[p.id]?`<span class="badge">${freeCnt[p.id]}</span>`:''}
-                <div class="pi">${p.emoji}</div><div class="pl">${p.name}</div>
-            </div>`).join('')}
+            ${FREE.map(p=>{
+                const rec = selFree.find(r=>r.type===p.id);
+                const done = !!rec;
+                const w = done ? WHO[rec.who] : null;
+                return `<div class="punch-btn ${done?'done '+w.cls:''}" onclick="toggleFree('${p.id}')">
+                    ${done?`<span class="badge" style="background:${w.cls==='dad'?'var(--blue)':'var(--pink)'}">${w.emoji}</span>`:''}
+                    <div class="pi">${done?'✓':p.emoji}</div>
+                    <div class="pl">${p.name}</div>
+                </div>`;
+            }).join('')}
         </div>
-        ${selFree.length?`<div style="margin-top:12px;font-size:12px;color:var(--text-secondary);text-align:center">${selLabel}已记 ${selFree.length} 条日常</div>`:`<div style="margin-top:12px;font-size:12px;color:var(--text-light);text-align:center">点上面按钮记一笔日常（做饭/哄睡/陪玩…）</div>`}
+        ${selFree.length?`<div style="margin-top:12px;font-size:12.5px;color:var(--text-secondary);text-align:center">${selLabel}已完成 ${selFree.length} 项 · 再点一下可取消</div>`:`<div style="margin-top:12px;font-size:12.5px;color:var(--text-light);text-align:center">选好爸爸/妈妈，点按钮打卡（一天每项只需点一次）</div>`}
     </div>`;
 }
 function renderDayRow(d, tk, selK){
@@ -409,14 +420,25 @@ function cycleSlot(dateKeyStr, typeId){
     renderPage();
 }
 function setWho(w){ curWho=w; ls.set('bw_curWho',w); renderPage(); vibrate(8); }
-function punchFree(typeId){
+/* 日常打卡：一天每项只能点一次；已做过再点=取消 */
+function toggleFree(typeId){
     const t=typeInfo(typeId);
     const targetDate = (typeof homeSelDate!=='undefined' && homeSelDate) ? homeSelDate : dateKey();
-    freeRecs.push({id:Date.now()+Math.floor(Math.random()*1000), date:targetDate, time:nowHM(), type:typeId, who:curWho, note:''});
-    ls.set('bw_free', freeRecs);
-    vibrate(12);
+    const idx = freeRecs.findIndex(r=>r.date===targetDate && r.type===typeId);
     const dl = targetDate===dateKey()?'今天':`${parseInt(targetDate.slice(5,7))}月${parseInt(targetDate.slice(8,10))}日`;
-    toast(`${WHO[curWho].emoji} ${WHO[curWho].name} · ${t.emoji} ${t.name}（${dl}）`);
+    if(idx>=0){
+        // 已做过 → 取消
+        const rec = freeRecs[idx];
+        freeRecs.splice(idx,1);
+        ls.set('bw_free', freeRecs);
+        vibrate(18);
+        toast(`已取消 ${WHO[rec.who].emoji} ${dl} ${t.name}`);
+    }else{
+        freeRecs.push({id:Date.now()+Math.floor(Math.random()*1000), date:targetDate, time:nowHM(), type:typeId, who:curWho, note:''});
+        ls.set('bw_free', freeRecs);
+        vibrate(12);
+        toast(`${WHO[curWho].emoji} ${WHO[curWho].name} · ${t.emoji} ${t.name}（${dl}）`);
+    }
     renderPage();
 }
 function delFree(id){ freeRecs=freeRecs.filter(r=>r.id!==id); ls.set('bw_free',freeRecs); renderPage(); toast('已删除'); }
