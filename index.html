@@ -307,14 +307,12 @@ function viewHome(){
     const days=[]; for(let i=0;i<7;i++){ const d=new Date(mon); d.setDate(mon.getDate()+i); days.push(d); }
     const tk=dateKey();
 
-    // 该周统计（按天去重：某天该人做了任意一项就算 1 天）
+    // 该周统计（按天去重：只算「居家」——某天谁居家就算谁带娃 1 天）
     const dadDaySet=new Set(), momDaySet=new Set();
     days.forEach(d=>{
         const k=dateKey(d), o=duty[k]||{};
-        DAILY.forEach(t=>{ if(o[t.id]==='dad') dadDaySet.add(k); else if(o[t.id]==='mom') momDaySet.add(k); });
+        if(o.bath==='dad') dadDaySet.add(k); else if(o.bath==='mom') momDaySet.add(k);
     });
-    const weekFree = freeRecs.filter(r=> r.date>=dateKey(days[0]) && r.date<=dateKey(days[6]));
-    weekFree.forEach(r=>{ if(r.who==='dad') dadDaySet.add(r.date); else if(r.who==='mom') momDaySet.add(r.date); });
     const dadCnt=dadDaySet.size, momCnt=momDaySet.size;
 
     const rangeLabel = homeWeekOffset===0 ? '本周' : (homeWeekOffset===-1?'上周':(homeWeekOffset===1?'下周':`${homeWeekOffset>0?'后':'前'}${Math.abs(homeWeekOffset)}周`));
@@ -338,11 +336,11 @@ function viewHome(){
     <div class="today-bar">
         <div class="who-card dad">
             <div class="wc-emoji">👨</div><div class="wc-name">爸爸</div>
-            <div class="wc-cnt">${dadCnt}</div><div class="wc-unit">${rangeLabel}带娃 · 天</div>
+            <div class="wc-cnt">${dadCnt}</div><div class="wc-unit">${rangeLabel}居家带娃 · 天</div>
         </div>
         <div class="who-card mom">
             <div class="wc-emoji">👩</div><div class="wc-name">妈妈</div>
-            <div class="wc-cnt">${momCnt}</div><div class="wc-unit">${rangeLabel}带娃 · 天</div>
+            <div class="wc-cnt">${momCnt}</div><div class="wc-unit">${rangeLabel}居家带娃 · 天</div>
         </div>
     </div>
 
@@ -477,16 +475,12 @@ function viewStats(){
         stat[r.type][r.who]++;
     });
 
-    // 总计：按【天】去重——某天做了任意一项就算 1 天
+    // 总计：按【天】去重——只算「居家」这一项，某天谁居家就算谁带娃 1 天
     const dadDays=new Set(), momDays=new Set();
     Object.keys(duty).forEach(k=>{
         if(!inRange(k)) return;
         const o=duty[k]||{};
-        DAILY.forEach(t=>{ if(o[t.id]==='dad') dadDays.add(k); else if(o[t.id]==='mom') momDays.add(k); });
-    });
-    freeRecs.forEach(r=>{
-        if(!inRange(r.date)) return;
-        if(r.who==='dad') dadDays.add(r.date); else if(r.who==='mom') momDays.add(r.date);
+        if(o.bath==='dad') dadDays.add(k); else if(o.bath==='mom') momDays.add(k);
     });
     const dadTotal=dadDays.size, momTotal=momDays.size;
     const total=dadTotal+momTotal;
@@ -515,13 +509,13 @@ function viewStats(){
     </div>
 
     <div class="stat-grid">
-        <div class="stat-box"><div class="stat-num" style="color:var(--blue)">${dadTotal}<span style="font-size:13px;font-weight:600">天</span></div><div class="stat-lbl">👨 爸爸带娃天数</div></div>
-        <div class="stat-box"><div class="stat-num" style="color:var(--pink)">${momTotal}<span style="font-size:13px;font-weight:600">天</span></div><div class="stat-lbl">👩 妈妈带娃天数</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--blue)">${dadTotal}<span style="font-size:13px;font-weight:600">天</span></div><div class="stat-lbl">👨 爸爸居家带娃天数</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--pink)">${momTotal}<span style="font-size:13px;font-weight:600">天</span></div><div class="stat-lbl">👩 妈妈居家带娃天数</div></div>
     </div>
 
     ${total?`
     <div class="card">
-        <div class="card-title">⚖️ 带娃分担</div>
+        <div class="card-title">⚖️ 居家带娃分担<span class="ext">按天</span></div>
         <div style="display:flex;height:26px;border-radius:13px;overflow:hidden;margin-bottom:9px">
             <div style="width:${dadTotal/total*100}%;background:linear-gradient(90deg,#9fc0e2,var(--blue));display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">${dadTotal?Math.round(dadTotal/total*100)+'%':''}</div>
             <div style="width:${momTotal/total*100}%;background:linear-gradient(90deg,var(--pink),#f8b8be);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700">${momTotal?Math.round(momTotal/total*100)+'%':''}</div>
