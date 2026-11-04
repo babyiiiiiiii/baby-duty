@@ -1,5 +1,5 @@
 // Service Worker - 带娃打卡离线缓存
-const CACHE_NAME = 'babywork-v19-chinup-blue';
+const CACHE_NAME = 'babywork-v20-chinup5-blue';
 const ASSETS = [
     './',
     './index.html',
