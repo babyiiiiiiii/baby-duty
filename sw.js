@@ -1,5 +1,5 @@
 // Service Worker - 带娃打卡离线缓存
-const CACHE_NAME = 'babywork-v15-round-blue';
+const CACHE_NAME = 'babywork-v16-tuned-blue';
 const ASSETS = [
     './',
     './index.html',
