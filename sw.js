@@ -1,5 +1,5 @@
 // Service Worker - 带娃打卡离线缓存
-const CACHE_NAME = 'babywork-v2-tiger';
+const CACHE_NAME = 'babywork-v3-tiger2';
 const ASSETS = [
     './',
     './index.html',
