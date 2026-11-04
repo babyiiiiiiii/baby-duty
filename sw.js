@@ -1,5 +1,5 @@
 // Service Worker - 带娃打卡离线缓存
-const CACHE_NAME = 'babywork-v10-fulltiger';
+const CACHE_NAME = 'babywork-v11-chinbowl';
 const ASSETS = [
     './',
     './index.html',
