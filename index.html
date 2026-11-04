@@ -273,23 +273,28 @@ function renderPage(){
     else if(curPage==='setting') m.innerHTML=viewSetting();
 }
 
-/* ---------- 首页：本周分工表 ---------- */
+/* ---------- 首页：分工表（可切换月份） ---------- */
+let homeMonthOffset = 0;
 function viewHome(){
-    // 本周一 ~ 周日
-    const now=new Date(); const wd=now.getDay()||7;
-    const mon=new Date(now); mon.setDate(now.getDate()-wd+1); mon.setHours(0,0,0,0);
-    const days=[]; for(let i=0;i<7;i++){ const d=new Date(mon); d.setDate(mon.getDate()+i); days.push(d); }
+    const now=new Date();
+    // 选中月份（homeMonthOffset 可翻月）
+    const base=new Date(now.getFullYear(), now.getMonth()+homeMonthOffset, 1);
+    const y=base.getFullYear(), m=base.getMonth();
+    const daysInMonth=new Date(y, m+1, 0).getDate();
+    const days=[]; for(let i=1;i<=daysInMonth;i++){ days.push(new Date(y, m, i)); }
     const tk=dateKey();
 
-    // 本周统计（按天去重：某天该人做了任意一项就算 1 天）
+    // 该月统计（按天去重：某天该人做了任意一项就算 1 天）
     const dadDaySet=new Set(), momDaySet=new Set();
     days.forEach(d=>{
         const k=dateKey(d), o=duty[k]||{};
         DAILY.forEach(t=>{ if(o[t.id]==='dad') dadDaySet.add(k); else if(o[t.id]==='mom') momDaySet.add(k); });
     });
-    const weekFree = freeRecs.filter(r=>{ const k=r.date; return days.some(d=>dateKey(d)===k); });
-    weekFree.forEach(r=>{ if(r.who==='dad') dadDaySet.add(r.date); else if(r.who==='mom') momDaySet.add(r.date); });
+    const monthFree = freeRecs.filter(r=> r.date>=dateKey(days[0]) && r.date<=dateKey(days[days.length-1]));
+    monthFree.forEach(r=>{ if(r.who==='dad') dadDaySet.add(r.date); else if(r.who==='mom') momDaySet.add(r.date); });
     const dadCnt=dadDaySet.size, momCnt=momDaySet.size;
+
+    const monthLabel = homeMonthOffset===0 ? `${m+1}月` : `${y}年${m+1}月`;
 
     // 今日免费打卡计数
     const todayFree = freeRecs.filter(r=>r.date===tk);
@@ -304,17 +309,25 @@ function viewHome(){
     <div class="today-bar">
         <div class="who-card dad">
             <div class="wc-emoji">👨</div><div class="wc-name">爸爸</div>
-            <div class="wc-cnt">${dadCnt}</div><div class="wc-unit">本周带娃 · 天</div>
+            <div class="wc-cnt">${dadCnt}</div><div class="wc-unit">${monthLabel}带娃 · 天</div>
         </div>
         <div class="who-card mom">
             <div class="wc-emoji">👩</div><div class="wc-name">妈妈</div>
-            <div class="wc-cnt">${momCnt}</div><div class="wc-unit">本周带娃 · 天</div>
+            <div class="wc-cnt">${momCnt}</div><div class="wc-unit">${monthLabel}带娃 · 天</div>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-title">📅 本周分工表<span class="ext">点格子填人</span></div>
+        <div class="week-nav" style="margin-bottom:11px">
+            <div class="week-title">📅 ${monthLabel}分工表</div>
+            <div class="week-btns">
+                <button onclick="homeMonthOffset--;renderPage()">‹</button>
+                <button onclick="homeMonthOffset=0;renderPage()">今</button>
+                <button onclick="homeMonthOffset++;renderPage()">›</button>
+            </div>
+        </div>
         <div class="day-table">${days.map(d=>renderDayRow(d, tk)).join('')}</div>
+        <div style="font-size:11px;color:var(--text-light);text-align:center;margin-top:8px">点格子循环：空 → 爸爸 → 妈妈 → 空</div>
     </div>
 
     <div class="card">
